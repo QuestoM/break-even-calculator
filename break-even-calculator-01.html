@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>מחשבון נקודת איזון</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f4f4f4;
+        }
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+        }
+        .calculator {
+            background-color: #fff;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+        label {
+            display: block;
+            margin-top: 10px;
+            font-weight: bold;
+        }
+        input[type="number"] {
+            width: 100%;
+            padding: 8px;
+            margin-top: 5px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+        }
+        button {
+            background-color: #3498db;
+            color: #fff;
+            border: none;
+            padding: 10px 20px;
+            margin-top: 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        button:hover {
+            background-color: #2980b9;
+        }
+        #result {
+            margin-top: 20px;
+            font-weight: bold;
+        }
+        #chart {
+            margin-top: 30px;
+        }
+        @media (max-width: 600px) {
+            body {
+                padding: 10px;
+            }
+            .calculator {
+                padding: 15px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <h1>מחשבון נקודת איזון</h1>
+    <div class="calculator">
+        <label for="fixedCosts">עלויות קבועות:</label>
+        <input type="number" id="fixedCosts" placeholder="הכנס עלויות קבועות">
+        
+        <label for="variableCosts">עלויות משתנות (ליחידה):</label>
+        <input type="number" id="variableCosts" placeholder="הכנס עלויות משתנות ליחידה">
+        
+        <label for="sellingPrice">מחיר מכירה (ליחידה):</label>
+        <input type="number" id="sellingPrice" placeholder="הכנס מחיר מכירה ליחידה">
+        
+        <button onclick="calculateBreakEven()">חשב נקודת איזון</button>
+        
+        <div id="result"></div>
+        
+        <canvas id="chart"></canvas>
+    </div>
+
+    <script>
+        let myChart;
+
+        function calculateBreakEven() {
+            const fixedCosts = parseFloat(document.getElementById('fixedCosts').value);
+            const variableCosts = parseFloat(document.getElementById('variableCosts').value);
+            const sellingPrice = parseFloat(document.getElementById('sellingPrice').value);
+
+            if (isNaN(fixedCosts) || isNaN(variableCosts) || isNaN(sellingPrice)) {
+                alert('נא להזין ערכים מספריים תקינים בכל השדות.');
+                return;
+            }
+
+            const breakEvenUnits = fixedCosts / (sellingPrice - variableCosts);
+            const breakEvenRevenue = breakEvenUnits * sellingPrice;
+
+            document.getElementById('result').innerHTML = `
+                <p>נקודת האיזון היא ב-${breakEvenUnits.toFixed(2)} יחידות.</p>
+                <p>ההכנסה בנקודת האיזון היא ₪${breakEvenRevenue.toFixed(2)}.</p>
+            `;
+
+            updateChart(fixedCosts, variableCosts, sellingPrice, breakEvenUnits);
+        }
+
+        function updateChart(fixedCosts, variableCosts, sellingPrice, breakEvenUnits) {
+            const ctx = document.getElementById('chart').getContext('2d');
+            
+            const units = Array.from({length: Math.ceil(breakEvenUnits * 2)}, (_, i) => i);
+            const totalCosts = units.map(u => fixedCosts + (variableCosts * u));
+            const revenue = units.map(u => sellingPrice * u);
+
+            if (myChart) {
+                myChart.destroy();
+            }
+
+            myChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: units,
+                    datasets: [{
+                        label: 'סך עלויות',
+                        data: totalCosts,
+                        borderColor: 'rgb(255, 99, 132)',
+                        fill: false
+                    }, {
+                        label: 'הכנסות',
+                        data: revenue,
+                        borderColor: 'rgb(54, 162, 235)',
+                        fill: false
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'יחידות'
+                            }
+                        },
+                        y: {
+                            title: {
+                                display: true,
+                                text: 'סכום (₪)'
+                            }
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'גרף נקודת איזון'
+                        }
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
