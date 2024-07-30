@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>מחשבון נקודת איזון מתקדם לעסקים</title>
+    <title>מחשבון נקודת איזון מתקדם ומקיף לעסקים</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.7.0/chart.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-annotation/2.1.0/chartjs-plugin-annotation.min.js"></script>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -59,7 +60,7 @@
         button:hover {
             background-color: #2980b9;
         }
-        #result, #sensitivityAnalysis {
+        #result, #sensitivityAnalysis, #multiProductAnalysis {
             margin-top: 20px;
         }
         #chart {
@@ -78,6 +79,31 @@
         th {
             background-color: #f2f2f2;
         }
+        .tooltip {
+            position: relative;
+            display: inline-block;
+            cursor: help;
+        }
+        .tooltip .tooltiptext {
+            visibility: hidden;
+            width: 200px;
+            background-color: #555;
+            color: #fff;
+            text-align: center;
+            border-radius: 6px;
+            padding: 5px;
+            position: absolute;
+            z-index: 1;
+            bottom: 125%;
+            left: 50%;
+            margin-left: -100px;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        .tooltip:hover .tooltiptext {
+            visibility: visible;
+            opacity: 1;
+        }
         @media (max-width: 768px) {
             .input-item {
                 flex-basis: 100%;
@@ -86,7 +112,7 @@
     </style>
 </head>
 <body>
-    <h1>מחשבון נקודת איזון מתקדם לעסקים</h1>
+    <h1>מחשבון נקודת איזון מתקדם ומקיף לעסקים</h1>
     <div class="calculator">
         <div class="input-group">
             <div class="input-item">
@@ -114,6 +140,12 @@
                 <input type="number" id="productionCapacity" placeholder="הכנס קיבולת ייצור מקסימלית">
             </div>
             <div class="input-item">
+                <label for="expectedSales">מכירות צפויות (חודשי):</label>
+                <input type="number" id="expectedSales" placeholder="הכנס מכירות צפויות">
+            </div>
+        </div>
+        <div class="input-group">
+            <div class="input-item">
                 <label for="timeFrame">מסגרת זמן:</label>
                 <select id="timeFrame">
                     <option value="monthly">חודשי</option>
@@ -121,11 +153,16 @@
                     <option value="yearly">שנתי</option>
                 </select>
             </div>
+            <div class="input-item">
+                <label for="taxRate">שיעור מס (%):</label>
+                <input type="number" id="taxRate" placeholder="הכנס שיעור מס">
+            </div>
         </div>
         <button onclick="calculateBreakEven()">חשב נקודת איזון ובצע ניתוח</button>
         
         <div id="result"></div>
         <div id="sensitivityAnalysis"></div>
+        <div id="multiProductAnalysis"></div>
         
         <canvas id="chart"></canvas>
     </div>
@@ -139,34 +176,52 @@
             const sellingPrice = parseFloat(document.getElementById('sellingPrice').value);
             const targetProfit = parseFloat(document.getElementById('targetProfit').value) || 0;
             const productionCapacity = parseFloat(document.getElementById('productionCapacity').value) || Infinity;
+            const expectedSales = parseFloat(document.getElementById('expectedSales').value) || 0;
             const timeFrame = document.getElementById('timeFrame').value;
+            const taxRate = parseFloat(document.getElementById('taxRate').value) || 0;
 
             if (isNaN(fixedCosts) || isNaN(variableCosts) || isNaN(sellingPrice)) {
                 alert('נא להזין ערכים מספריים תקינים בכל השדות החובה.');
                 return;
             }
 
-            const breakEvenUnits = fixedCosts / (sellingPrice - variableCosts);
+            const contributionMargin = sellingPrice - variableCosts;
+            const breakEvenUnits = fixedCosts / contributionMargin;
             const breakEvenRevenue = breakEvenUnits * sellingPrice;
-            const targetProfitUnits = (fixedCosts + targetProfit) / (sellingPrice - variableCosts);
+            const targetProfitUnits = (fixedCosts + targetProfit) / contributionMargin;
             const targetProfitRevenue = targetProfitUnits * sellingPrice;
 
             const timeMultiplier = timeFrame === 'quarterly' ? 3 : (timeFrame === 'yearly' ? 12 : 1);
             
+            const marginOfSafety = ((expectedSales - breakEvenUnits) / expectedSales * 100).toFixed(2);
+            const marginOfSafetyUnits = expectedSales - breakEvenUnits;
+            
+            const profitAtExpectedSales = (expectedSales * contributionMargin) - fixedCosts;
+            const profitAfterTax = profitAtExpectedSales * (1 - (taxRate / 100));
+            
+            const operatingLeverage = (expectedSales * contributionMargin) / profitAtExpectedSales;
+
             let resultHTML = `
                 <h2>תוצאות הניתוח</h2>
                 <p><strong>נקודת האיזון:</strong> ${breakEvenUnits.toFixed(2)} יחידות</p>
                 <p><strong>הכנסה בנקודת האיזון:</strong> ₪${breakEvenRevenue.toFixed(2)}</p>
                 <p><strong>יחידות נדרשות ליעד הרווח:</strong> ${targetProfitUnits.toFixed(2)}</p>
                 <p><strong>הכנסה נדרשת ליעד הרווח:</strong> ₪${targetProfitRevenue.toFixed(2)}</p>
+                <p><strong>מרווח תרומה ליחידה:</strong> ₪${contributionMargin.toFixed(2)}</p>
+                <p><strong>אחוז מרווח תרומה:</strong> ${((contributionMargin / sellingPrice) * 100).toFixed(2)}%</p>
+                <p class="tooltip"><strong>מרווח בטיחות:</strong> ${marginOfSafety}% (${marginOfSafetyUnits.toFixed(2)} יחידות)
+                    <span class="tooltiptext">ההפרש בין המכירות הצפויות לנקודת האיזון, מבוטא באחוזים וביחידות</span>
+                </p>
+                <p><strong>רווח צפוי (לפני מס):</strong> ₪${profitAtExpectedSales.toFixed(2)}</p>
+                <p><strong>רווח צפוי (אחרי מס):</strong> ₪${profitAfterTax.toFixed(2)}</p>
+                <p class="tooltip"><strong>מנוף תפעולי:</strong> ${operatingLeverage.toFixed(2)}
+                    <span class="tooltiptext">מדד לרגישות הרווח לשינויים במכירות</span>
+                </p>
             `;
 
             if (targetProfitUnits > productionCapacity) {
                 resultHTML += `<p style="color: red;"><strong>אזהרה:</strong> יעד הרווח חורג מקיבולת הייצור המקסימלית!</p>`;
             }
-
-            const marginOfSafety = ((productionCapacity - breakEvenUnits) / productionCapacity * 100).toFixed(2);
-            resultHTML += `<p><strong>מרווח בטיחות:</strong> ${marginOfSafety}%</p>`;
 
             document.getElementById('result').innerHTML = resultHTML;
 
@@ -174,18 +229,28 @@
             const sensitivityAnalysis = performSensitivityAnalysis(fixedCosts, variableCosts, sellingPrice, timeMultiplier);
             document.getElementById('sensitivityAnalysis').innerHTML = sensitivityAnalysis;
 
-            updateChart(fixedCosts, variableCosts, sellingPrice, breakEvenUnits, targetProfitUnits, productionCapacity, timeMultiplier);
+            // ניתוח מוצרים מרובים
+            const multiProductAnalysis = performMultiProductAnalysis(fixedCosts, [
+                { name: "מוצר A", price: sellingPrice, variableCost: variableCosts, salesMix: 0.5 },
+                { name: "מוצר B", price: sellingPrice * 1.2, variableCost: variableCosts * 1.1, salesMix: 0.3 },
+                { name: "מוצר C", price: sellingPrice * 0.9, variableCost: variableCosts * 0.95, salesMix: 0.2 }
+            ]);
+            document.getElementById('multiProductAnalysis').innerHTML = multiProductAnalysis;
+
+            updateChart(fixedCosts, variableCosts, sellingPrice, breakEvenUnits, targetProfitUnits, productionCapacity, expectedSales, timeMultiplier);
         }
 
         function performSensitivityAnalysis(fixedCosts, variableCosts, sellingPrice, timeMultiplier) {
             let html = '<h2>ניתוח רגישות</h2>';
-            html += '<table><tr><th>פרמטר</th><th>שינוי</th><th>נקודת איזון חדשה</th></tr>';
+            html += '<table><tr><th>פרמטר</th><th>שינוי</th><th>נקודת איזון חדשה</th><th>השפעה</th></tr>';
 
             const scenarios = [
                 { param: 'מחיר מכירה', changes: [0.9, 1.1] },
                 { param: 'עלויות משתנות', changes: [0.9, 1.1] },
                 { param: 'עלויות קבועות', changes: [0.9, 1.1] }
             ];
+
+            const baseBreakEven = fixedCosts / (sellingPrice - variableCosts);
 
             scenarios.forEach(scenario => {
                 scenario.changes.forEach(change => {
@@ -198,7 +263,8 @@
                         newBreakEven = (fixedCosts * change) / (sellingPrice - variableCosts);
                     }
                     const changePercent = change > 1 ? '+10%' : '-10%';
-                    html += `<tr><td>${scenario.param}</td><td>${changePercent}</td><td>${newBreakEven.toFixed(2)} יחידות</td></tr>`;
+                    const impact = ((newBreakEven - baseBreakEven) / baseBreakEven * 100).toFixed(2) + '%';
+                    html += `<tr><td>${scenario.param}</td><td>${changePercent}</td><td>${newBreakEven.toFixed(2)} יחידות</td><td>${impact}</td></tr>`;
                 });
             });
 
@@ -206,96 +272,144 @@
             return html;
         }
 
-        function updateChart(fixedCosts, variableCosts, sellingPrice, breakEvenUnits, targetProfitUnits, productionCapacity, timeMultiplier) {
-            const ctx = document.getElementById('chart').getContext('2d');
+        function performMultiProductAnalysis(fixedCosts, products) {
+        let html = '<h2>ניתוח מוצרים מרובים</h2>';
+        html += '<table><tr><th>מוצר</th><th>מחיר</th><th>עלות משתנה</th><th>תמהיל מכירות</th><th>מרווח תרומה</th><th>מרווח תרומה משוקלל</th></tr>';
+
+        let totalWeightedCM = 0;
+        products.forEach(product => {
+            const cm = product.price - product.variableCost;
+            const weightedCM = cm * product.salesMix;
+            totalWeightedCM += weightedCM;
             
-            const maxUnits = Math.max(breakEvenUnits * 2, targetProfitUnits, productionCapacity);
-            const units = Array.from({length: Math.ceil(maxUnits)}, (_, i) => i);
-            const totalCosts = units.map(u => fixedCosts + (variableCosts * u));
-            const revenue = units.map(u => sellingPrice * u);
+            html += `<tr>
+                <td>${product.name}</td>
+                <td>₪${product.price.toFixed(2)}</td>
+                <td>₪${product.variableCost.toFixed(2)}</td>
+                <td>${(product.salesMix * 100).toFixed(2)}%</td>
+                <td>₪${cm.toFixed(2)}</td>
+                <td>₪${weightedCM.toFixed(2)}</td>
+            </tr>`;
+        });
 
-            if (myChart) {
-                myChart.destroy();
-            }
+        const breakEvenUnits = fixedCosts / totalWeightedCM;
+        
+        html += `</table>
+            <p><strong>סה"כ מרווח תרומה משוקלל:</strong> ₪${totalWeightedCM.toFixed(2)}</p>
+            <p><strong>נקודת איזון (סה"כ יחידות):</strong> ${breakEvenUnits.toFixed(2)}</p>
+            <h3>נקודת איזון לכל מוצר:</h3>
+            <ul>`;
+        
+        products.forEach(product => {
+            const productBreakEven = breakEvenUnits * product.salesMix;
+            html += `<li>${product.name}: ${productBreakEven.toFixed(2)} יחידות</li>`;
+        });
+        
+        html += '</ul>';
+        return html;
+    }
 
-            myChart = new Chart(ctx, {
-                type: 'line',
-                data: {
-                    labels: units,
-                    datasets: [{
-                        label: 'סך עלויות',
-                        data: totalCosts,
-                        borderColor: 'rgb(255, 99, 132)',
-                        fill: false
-                    }, {
-                        label: 'הכנסות',
-                        data: revenue,
-                        borderColor: 'rgb(54, 162, 235)',
-                        fill: false
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    scales: {
-                        x: {
-                            title: {
-                                display: true,
-                                text: 'יחידות'
-                            }
-                        },
-                        y: {
-                            title: {
-                                display: true,
-                                text: 'סכום (₪)'
-                            }
-                        }
-                    },
-                    plugins: {
+    function updateChart(fixedCosts, variableCosts, sellingPrice, breakEvenUnits, targetProfitUnits, productionCapacity, expectedSales, timeMultiplier) {
+        const ctx = document.getElementById('chart').getContext('2d');
+        
+        const maxUnits = Math.max(breakEvenUnits * 2, targetProfitUnits, productionCapacity, expectedSales);
+        const units = Array.from({length: Math.ceil(maxUnits)}, (_, i) => i);
+        const totalCosts = units.map(u => fixedCosts + (variableCosts * u));
+        const revenue = units.map(u => sellingPrice * u);
+
+        if (myChart) {
+            myChart.destroy();
+        }
+
+        myChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: units,
+                datasets: [{
+                    label: 'סך עלויות',
+                    data: totalCosts,
+                    borderColor: 'rgb(255, 99, 132)',
+                    fill: false
+                }, {
+                    label: 'הכנסות',
+                    data: revenue,
+                    borderColor: 'rgb(54, 162, 235)',
+                    fill: false
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    x: {
                         title: {
                             display: true,
-                            text: 'גרף נקודת איזון'
-                        },
-                        annotation: {
-                            annotations: {
-                                breakEvenLine: {
-                                    type: 'line',
-                                    xMin: breakEvenUnits,
-                                    xMax: breakEvenUnits,
-                                    borderColor: 'rgb(255, 99, 132)',
-                                    borderWidth: 2,
-                                    label: {
-                                        content: 'נקודת איזון',
-                                        enabled: true
-                                    }
-                                },
-                                targetProfitLine: {
-                                    type: 'line',
-                                    xMin: targetProfitUnits,
-                                    xMax: targetProfitUnits,
-                                    borderColor: 'rgb(75, 192, 192)',
-                                    borderWidth: 2,
-                                    label: {
-                                        content: 'יעד רווח',
-                                        enabled: true
-                                    }
-                                },
-                                capacityLine: {
-                                    type: 'line',
-                                    xMin: productionCapacity,
-                                    xMax: productionCapacity,
-                                    borderColor: 'rgb(255, 159, 64)',
-                                    borderWidth: 2,
-                                    label: {
-                                        content: 'קיבולת מקסימלית',
-                                        enabled: true
-                                    }
+                            text: 'יחידות'
+                        }
+                    },
+                    y: {
+                        title: {
+                            display: true,
+                            text: 'סכום (₪)'
+                        }
+                    }
+                },
+                plugins: {
+                    title: {
+                        display: true,
+                        text: 'גרף נקודת איזון'
+                    },
+                    annotation: {
+                        annotations: {
+                            breakEvenLine: {
+                                type: 'line',
+                                xMin: breakEvenUnits,
+                                xMax: breakEvenUnits,
+                                borderColor: 'rgb(255, 99, 132)',
+                                borderWidth: 2,
+                                label: {
+                                    content: 'נקודת איזון',
+                                    enabled: true
+                                }
+                            },
+                            targetProfitLine: {
+                                type: 'line',
+                                xMin: targetProfitUnits,
+                                xMax: targetProfitUnits,
+                                borderColor: 'rgb(75, 192, 192)',
+                                borderWidth: 2,
+                                label: {
+                                    content: 'יעד רווח',
+                                    enabled: true
+                                }
+                            },
+                            capacityLine: {
+                                type: 'line',
+                                xMin: productionCapacity,
+                                xMax: productionCapacity,
+                                borderColor: 'rgb(255, 159, 64)',
+                                borderWidth: 2,
+                                label: {
+                                    content: 'קיבולת מקסימלית',
+                                    enabled: true
+                                }
+                            },
+                            expectedSalesLine: {
+                                type: 'line',
+                                xMin: expectedSales,
+                                xMax: expectedSales,
+                                borderColor: 'rgb(153, 102, 255)',
+                                borderWidth: 2,
+                                label: {
+                                    content: 'מכירות צפויות',
+                                    enabled: true
                                 }
                             }
                         }
                     }
                 }
-            });
-        }
-    </script>
+            }
+        });
+    }
+</script>
 </body>
 </html>
