@@ -104,6 +104,13 @@
             visibility: visible;
             opacity: 1;
         }
+        footer {
+            text-align: center;
+            margin-top: 2rem;
+            padding: 1rem;
+            background-color: var(--secondary-color);
+            color: white;
+        }
         @media (max-width: 768px) {
             .input-item {
                 flex-basis: 100%;
@@ -166,6 +173,11 @@
         
         <canvas id="chart"></canvas>
     </div>
+    
+    <footer>
+        <p>&copy; 2024 Questo Media Solutions. All rights reserved.</p>
+        <p>Disclaimer: This calculator is for informational purposes only. Please consult with a financial advisor for professional advice.</p>
+    </footer>
 
     <script>
         let myChart;
